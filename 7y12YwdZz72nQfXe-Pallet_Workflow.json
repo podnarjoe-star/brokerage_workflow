@@ -1,0 +1,252 @@
+{
+  "name": "Pallet_Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Gmail Trigger - Monitor Inbox').item.json.id }}",
+        "message": "={{ $('ClaudeReply').item.json.content[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1168,
+        0
+      ],
+      "id": "c115d5f8-212c-4937-8e0a-d208dceaef2d",
+      "name": "Reply to a message",
+      "webhookId": "85f9d48e-6d60-4c82-bf50-0e46b2abb623",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FAyyB8PmhA4I9e8L",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger - Monitor Inbox').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1376,
+        0
+      ],
+      "id": "eb5151ce-0ccf-417d-a7b7-3d53d988d8af",
+      "name": "Mark a message as read",
+      "webhookId": "ca9fe313-63e2-4b4a-9309-c1acd28cd4e6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FAyyB8PmhA4I9e8L",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Gmail Trigger - Monitor Inbox').item.json.id }}",
+        "labelIds": "={{ [$(\"JavaScript Investigation\").item.json.labelId] }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        0
+      ],
+      "id": "51081e72-7aed-4adb-94be-7619527c2485",
+      "name": "Add label to message",
+      "webhookId": "8e70663c-5956-4277-92b3-edb1bd77a8a5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FAyyB8PmhA4I9e8L",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an AI assistant for a freight brokerage customer support team.\n\nAnalyze the following email and classify it into exactly one of these three categories:\n1. SHIPMENT_STATUS - Customer asking where their load is or requesting an ETA\n2. RATE_QUOTE - Customer requesting a price quote for a shipment\n3. POD_REQUEST - Customer requesting proof of delivery or signed BOL for a load\n\nEmail Subject: {{ $input.item.json.Subject }}\nEmail Body: {{ $input.item.json.snippet }}\nSender: {{ $input.item.json.From }}\n\nRespond with ONLY a JSON object in this exact format, nothing else:\n{\n  \"category\": \"SHIPMENT_STATUS\",\n  \"load_number\": \"extracted load number or null\",\n  \"origin\": \"extracted origin or null\",\n  \"destination\": \"extracted destination or null\",\n  \"sender_email\": \"sender email address\"\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "76c4fe82-f9c8-40f9-859d-54f8a070fa28",
+      "name": "ClaudeClassify",
+      "credentials": {
+        "anthropicApi": {
+          "id": "KNoINm7IEBj3Icxb",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a professional customer support agent for a freight brokerage.\n\nBased on the investigation results below, write a helpful and professional email response to the customer.\n\nCategory: {{ $input.item.json.category }}\nSender: {{ $input.item.json.sender_email }}\nLoad Number: {{ $input.item.json.load_number }}\nInvestigation Result: {{ JSON.stringify($input.item.json.investigation) }}\n\nWrite a short, professional email response that:\n- Addresses the customer's request directly\n- Includes all relevant information from the investigation\n- Is friendly and concise\n- Does not include a subject line\n- Signs off as \"Freight Support Team\"\n\nReturn only the email body, nothing else."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        800,
+        0
+      ],
+      "id": "0a435d56-b703-41a7-b73f-e853b063b18e",
+      "name": "ClaudeReply",
+      "credentials": {
+        "anthropicApi": {
+          "id": "KNoINm7IEBj3Icxb",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grab Claude's raw text response from the previous node\nconst claudeOutput = $input.item.json.content[0].text;\n\n// Parse the JSON from Claude's response\nconst jsonMatch = claudeOutput.match(/\\{[\\s\\S]*\\}/);\nconst parsed = JSON.parse(jsonMatch[0]);\n\n// Extract the two key fields Claude identified\nconst category = parsed.category;\nconst loadNumber = parsed.load_number;\n\n// Mock TMS data — simulates a real TMS API response by load number\nconst mockTMS = {\n  \"1234592\": {\n    load_number: \"1234592\",\n    status: \"In Transit\",\n    origin: \"Cincinnati, OH\",\n    destination: \"Chicago, IL\",\n    driver: \"Mike Johnson\",\n    carrier: \"Swift Transportation\",\n    eta: \"April 9, 2026 by 3:00 PM\",\n    last_location: \"Indianapolis, IN as of 8:00 AM\"\n  },\n  \"45823\": {\n    load_number: \"45823\",\n    status: \"Delivered\",\n    origin: \"Atlanta, GA\",\n    destination: \"Chicago, IL\",\n    driver: \"Sarah Williams\",\n    carrier: \"Werner Enterprises\",\n    eta: \"Delivered April 7, 2026 at 2:30 PM\",\n    last_location: \"Chicago, IL\"\n  }\n};\n\n// Mock rate data — simulates a rate engine lookup by lane\nconst mockRates = {\n  \"Cincinnati-Chicago\": { rate: \"$850\", transit_time: \"1 day\", carrier: \"Swift Transportation\" },\n  \"Atlanta-Chicago\": { rate: \"$1,200\", transit_time: \"2 days\", carrier: \"Werner Enterprises\" },\n  \"default\": { rate: \"$950\", transit_time: \"2-3 days\", carrier: \"Best available carrier\" }\n};\n\n// Mock POD data — simulates a document retrieval system by load number\nconst mockPODs = {\n  \"1234592\": { pod_url: \"https://tms.brokerage.com/pods/1234592.pdf\", signed_by: \"John Smith\", delivery_time: \"April 7, 2026 at 2:30 PM\" },\n  \"45823\": { pod_url: \"https://tms.brokerage.com/pods/45823.pdf\", signed_by: \"Mary Johnson\", delivery_time: \"April 7, 2026 at 11:00 AM\" }\n};\n\nlet investigationResult = {};\n\n// Route to the correct data source based on Claude's classification\nif (category === \"SHIPMENT_STATUS\") {\n  if (!loadNumber) {\n    // No load number extracted — flag for human follow up\n    investigationResult = { error: \"No load number provided\", message: \"Please ask the customer to provide their load number so we can look up the shipment status.\" };\n  } else {\n    // Look up load in TMS — if not found, flag for manual lookup\n    investigationResult = mockTMS[loadNumber] || { error: \"Load not found\", message: \"No shipment found for load \" + loadNumber + \". May need manual lookup.\" };\n  }\n} else if (category === \"RATE_QUOTE\") {\n  // Build lane key from origin/destination and pull rate\n  const key = `${parsed.origin}-${parsed.destination}`;\n  investigationResult = mockRates[key] || mockRates[\"default\"];\n} else if (category === \"POD_REQUEST\") {\n  if (!loadNumber) {\n    // No load number extracted — flag for human follow up\n    investigationResult = { error: \"No load number provided\", message: \"Please ask the customer to provide their load number so we can look up the POD.\" };\n  } else {\n    // Look up POD document — if not found, flag for manual lookup\n    investigationResult = mockPODs[loadNumber] || { error: \"POD not found\", message: \"No POD found for load \" + loadNumber + \". May need manual lookup.\" };\n  }\n}\n\n// Default to Processed — switch to Needs Action if investigation failed\nlet labelId = \"Label_7769852500067835149\"; // Processed\nif (investigationResult.error) {\n  labelId = \"Label_1580129994340978842\"; // Needs Action\n}\n\n// Pass all data forward to the reply drafter and label nodes\nreturn [\n  {\n    json: {\n      category: category,\n      load_number: loadNumber,\n      sender_email: parsed.sender_email,\n      origin: parsed.origin,\n      destination: parsed.destination,\n      investigation: investigationResult,\n      labelId: labelId\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        0
+      ],
+      "id": "1abca250-99f7-4a12-b7a8-75df5df8d57e",
+      "name": "JavaScript Investigation"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "755f073e-1877-43ae-8b26-e4cf3338795e",
+      "name": "Gmail Trigger - Monitor Inbox",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FAyyB8PmhA4I9e8L",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Reply to a message": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark a message as read": {
+      "main": [
+        [
+          {
+            "node": "Add label to message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ClaudeClassify": {
+      "main": [
+        [
+          {
+            "node": "JavaScript Investigation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ClaudeReply": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JavaScript Investigation": {
+      "main": [
+        [
+          {
+            "node": "ClaudeReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger - Monitor Inbox": {
+      "main": [
+        [
+          {
+            "node": "ClaudeClassify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
